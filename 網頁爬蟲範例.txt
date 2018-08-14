@@ -1,0 +1,100 @@
+範例：找尋網頁中email的寫法：(以"http://www.imis.ncku.edu.tw/files/11-1398-18038.php?Lang=zh-tw")為例搜尋網頁中的email  
+import requests,re
+regex=r"([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)" #email的正規表示法
+url="http://www.imis.ncku.edu.tw/files/11-1398-18038.php?Lang=zh-tw"    #設定要搜尋email的所在網址
+html=requests.get(url).text      #以requests語法將url內容轉換成字串傳回
+emails=re.findall(regex,html)     #以re語法中的findall去html中查詢符合regex條件的內容         findall(a,b)->在b中尋找符合a條件的內容
+for email in emails:
+    print(email)
+
+範例：找尋網頁中所有連結的網址
+from bs4 import BeautifulSoup as soup
+import requests
+url="http://www.imis.ncku.edu.tw/files/11-1398-18038.php?Lang=zh-tw"
+html=requests.get(url).text
+html_soup=soup(html,'html.parser')
+data=html_soup.find_all('a')     #把取得的所有a標籤的連結都存到變數data裡面
+for link in data:
+    href=link.get('href')      #從a標籤的內容中，取得以href為首的字串
+    if href != None and href.startswith('http://'):     #若href 不等於None，並且取出href的字首為http://的字串(但不包含顯示"http://")    ( 參考：http://ripple0129.blogspot.com/2014/07/python-sysargv.html)
+        print(href)
+
+補充：
+1.若    href=link.get('href')改為    href=data[10].get('href')，則可變為取得a標籤的第9個順序的href 內容
+2.變數.startswich("A")    ->表示取得以A為字首的字串
+
+補充：sys.argv的用法     (參閱：https://blog.csdn.net/zengxyuyu/article/details/53047074）
+1.sys.argv中[]是用來獲取命令行參數的，它是個列表。
+2.len(sys.argv)可得到參數的個數
+3.sys.argv[0]獲得的是腳本的名字
+
+範例：擷取網頁中的圖檔
+from bs4 import BeautifulSoup as soup
+from urllib.parse import urlparse
+import requests,sys
+if len(sys.argv)<2:      #如果參數個數小於2時，則顯示nothing，並離開程式(此範例應該用不到)
+    print('nothing')
+    exit(1)
+url="http://www.imis.ncku.edu.tw/files/11-1398-18038.php?Lang=zh-tw"
+domain="{}://{}".format(urlparse(url).scheme,urlparse(url).hostname)     #建立domain    (正規用法，可再參照下附圖A的urlparse的語法)
+print(urlparse(url).scheme)   #抓取網域名稱  (http)
+print(urlparse(url).hostname)    #抓取host  名稱(www.imis.ncku.edu.tw)
+print(domain)
+html=requests.get(url).text       #取得網址的text格式
+sp=soup(html,'html.parser')      #將html  的字串內容丟入soup的分析器
+all_links=sp.find_all(['td','img']) #查詢包含td & img字串的資料 (用原始碼觀察圖片檔的編輯方式，有可能是td+img   或是a+img的方式，此範例為td+img)
+for link in all_links:
+    src=link.get('src')       #從link中取得以src 為開頭的標籤字串
+    href=link.get('href')   #從link中取得以href為開頭的標籤字串
+    targets=[src,href]    #將src 及   href   搜索出的結果組成targets的變數
+    for t in targets:
+        if t !=None and ('.jpg' in t or '.png' in t ):     #如果t變數值不為None(空白)    並且副檔名為.jpg或是.png，則......
+            if t.startswith('http'):      #若變數t的開頭字串為"http"，則.....
+                print(t)
+            else:
+                print(domain+t)        #domain即"http://www.imis.ncku.edu.tw"      #   觀察得到的t結果後，發現實際超連結的字首還需要加上[http://www.imis.ncku.edu.tw]，才能取得真正的圖片連結路徑
+
+補充：
+1.print("a","b")    ->結果為2個字串一起顯示(但字串與字串中間可能有空白)
+2.print("a"+"b")    ->結果為2個字串加起來顯示 (字串a與字串b已形成一個新的字串c)
+
+
+範例：尋找網頁中的圖片，並將圖片存到指定的資料夾
+from bs4 import BeautifulSoup as soup
+from urllib.parse import urlparse
+from urllib.request import urlopen
+import requests,sys,os
+url="http://www.imis.ncku.edu.tw/files/11-1398-18038.php?Lang=zh-tw"
+domain="{}://{}".format(urlparse(url).scheme,urlparse(url).hostname)
+print(urlparse(url).scheme)
+print(urlparse(url).hostname)
+print(domain)
+html=requests.get(url).text
+sp=soup(html,'html.parser')
+all_links=sp.find_all(['td','img']) #查詢包含a & img字串的資料
+if not os.path.exists('c:\image'):
+    os.mkdir('c:\image')  #如果資料夾image不存在時，則建立該資料夾
+for link in all_links:
+    src=link.get('src')
+    href=link.get('href')
+    targets=[src,href]
+    for t in targets:
+        if t !=None and ('.jpg' in t or '.png' in t ):
+            if t.startswith('http'):
+                full_path=t
+            else:
+                full_path=domain + t
+            print(full_path)
+        #image_dir=url.split('/')[-1]  #將url以分割符號("/")進行分割，並只取最後一段的字串
+        #if not os.path.exists(image_dir): os.mkdir(image_dir)
+        filename=full_path.split('/')[-1]
+        ext=filename.split('.')[-1]  #抓取副檔名的名稱並存入變數ext
+        filename=filename.split('.')[-2]
+        if 'jpg' in ext:
+            filename=filename+'.jpg'
+        else:
+            filename=filename+'.png'
+        image=urlopen(full_path)
+        fp=open(os.path.join("c:\image",filename),'wb')
+        fp.write(image.read())
+        fp.close
